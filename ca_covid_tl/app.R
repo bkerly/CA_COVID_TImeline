@@ -304,6 +304,11 @@ master_graph <-function(start_date,end_date){
   
 }
 
+
+# UI ----------------------------------------------------------------------
+
+
+
 ui <- fluidPage(
   sidebarLayout(
     
@@ -312,21 +317,98 @@ ui <- fluidPage(
         "daterange", label = "Date Range",
         min = ymd("2019-9-1"), max = ymd("2023-4-1"),
         value = c(ymd("2020-3-1"),ymd("2022-3-1"))
-      )
-    ),
+      ), #/ sliderInput
+      
+      checkboxGroupInput(
+        "graphs", label = "Select Graphs to Display",
+        choices = c(
+          "Timeline",
+          "Hospitalizatons",
+          "Vaccine Doses",
+          "Percent Fully Vaccinated",
+          "Variants",
+          "Reopening Plan"
+        ),
+        selected = c(
+          "Timeline",
+          "Hospitalizatons",
+          "Vaccine Doses",
+          "Percent Fully Vaccinated",
+          "Variants"
+        )
+      ), #/ checkboxGroupInput Graphs
+      
+      sliderInput(inputId = "height", label = "Height", min = 500, max = 2000, value = 1000),
+      sliderInput(inputId = "width", label = "Width", min = 500, max = 2000, value = 1250),
+
+        downloadButton('downloadData', 'Download Data'),
+        downloadButton('downloadPlot', 'Download Plot'
+                       ) #/ Download Buttons
+        
+      
+    ), #/ sidebar panel
     
     mainPanel(
       plotOutput("timeline", height="800px")
-    )
+    ) #/ main panel
   )
 
 )
 
+
+# Server ------------------------------------------------------------------
+
+
+
 server <- function(input, output, session) {
-  output$timeline <- renderPlot({
+
+  # Make the plot
+  
+  make_plot <- function(){
     master_graph(start_date = input$daterange[1],
                  end_date = input$daterange[2])
-  })
+  }
+  
+  # Draw the plot
+  
+  output$timeline <- renderPlot(
+    width = function() input$width,
+    height = function() input$height,
+    res = 96,
+    make_plot()
+    )
+  
+  # Download Plot
+  
+  output$downloadPlot <- downloadHandler(
+    filename = "Timeline plot.png",
+    
+    content = function(file){
+      png(file,
+          width = input$width,
+          height = input$height)
+      
+        make_plot() %>% print()
+      
+      dev.off()
+        
+    }
+  )
+    
+  # Downloading Data
+    data <- COVID_Timeline
+
+    output$downloadData <- downloadHandler(
+      filename = "Timeline data.csv",
+
+      content = function(file){
+          write.csv(data, file)
+      }
+    )
+      
+    
+    
+  
 }
 
 shinyApp(ui = ui, server = server)
