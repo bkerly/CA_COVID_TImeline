@@ -26,12 +26,13 @@ hospital_state <- hospital_data %>%
             total = confirmed+suspected)
 
 hospital_state %>%
-  select(-total) %>%
+  select(-total,-suspected) %>% # suspected removed per preference of James Watt
   pivot_longer(-date) %>%
   ggplot(aes(x=date,y=value,fill=name)) +
   geom_area(position = position_stack(reverse = TRUE),
             stat="identity") +
-  scale_fill_manual(values = c("darkred","red"))+
+  scale_fill_manual(values = c("darkred"#,"red"
+                               ))+
   theme_minimal()+
   theme(legend.position = "none")+
   ylab("COVID Hospitalizations")+
@@ -44,7 +45,7 @@ hospital_state %>%
 
 vaccine_data <- read_csv("covid-19-vaccines-administered-by-demographics.csv")
 
-vaccine_state <- vaccine_data %>%
+vaccine_categories <- vaccine_data %>%
   filter(demographic_category %in% "Age Group") %>%
   mutate(date = administered_date) %>%
   group_by(date) %>%
@@ -54,25 +55,58 @@ vaccine_state <- vaccine_data %>%
             one_dose = sum(cumulative_at_least_one_dose) - (bv_boosted+boosted+fully_vax)
   )
 
-vaccine_state %>%
-  pivot_longer(-date) %>%
-  mutate(name = factor(name, 
-                       levels = c(
-                         "one_dose",
-                         "fully_vax",
-                         "boosted",
-                         "bv_boosted")
+vaccine_doses <- vaccine_data %>%
+  filter(demographic_category %in% "Age Group") %>%
+  mutate(date = administered_date) %>%
+  group_by(date) %>%
+  summarize(total_doses = sum(cumulative_total_doses)
   )
-  ) %>%
-  ggplot(aes(x=date,y=value,fill=name)) +
+
+vaccine_fully <- vaccine_data %>%
+  filter(demographic_category %in% "Age Group") %>%
+  mutate(date = administered_date) %>%
+  group_by(date) %>%
+  summarize(pct_vaccinated = 100*sum(cumulative_fully_vaccinated) / (39029342) # https://www.census.gov/quickfacts/CA, population July 1 2022
+  )
+
+
+# vaccine_state %>%
+#   pivot_longer(-date) %>%
+#   mutate(name = factor(name, 
+#                        levels = c(
+#                          "one_dose",
+#                          "fully_vax",
+#                          "boosted",
+#                          "bv_boosted")
+#   )
+#   ) %>%
+#   ggplot(aes(x=date,y=value,fill=name)) +
+#   geom_area(position = position_stack(reverse = TRUE),
+#             stat="identity") +
+#   scale_fill_manual(values = c("lightblue","blue","darkblue","purple"))+
+#   theme_minimal()+
+#   theme(legend.position = "none")+
+#   ylab("COVID Vaccinations")+
+#   xlab("")
+
+
+vaccine_doses %>%
+  ggplot(aes(x=date,y=total_doses)) +
   geom_area(position = position_stack(reverse = TRUE),
-            stat="identity") +
-  scale_fill_manual(values = c("lightblue","blue","darkblue","purple"))+
+            stat="identity", fill = "lightgreen") +
   theme_minimal()+
   theme(legend.position = "none")+
-  ylab("COVID Vaccinations")+
+  ylab("COVID Vaccine Doses")+
   xlab("")
 
+vaccine_fully %>%
+  ggplot(aes(x=date,y=pct_vaccinated)) +
+  geom_area(position = position_stack(reverse = TRUE),
+            stat="identity", fill = "darkgreen") +
+  theme_minimal()+
+  theme(legend.position = "none")+
+  ylab("Percent Population Fully Vaccinated")+
+  xlab("")
 
 # Variants ----------------------------------------------------------------
 
@@ -156,13 +190,14 @@ COVID_Timeline %>%
 
 
 
-master_graph <-function(start_date,end_date){
+master_graph <-function(start_date = ymd("2020-3-1"),end_date = ymd("2022-3-1")){
   hosp_graph <- hospital_state %>%
     filter( date >= start_date,
             date <= end_date
     ) %>%
     select(-total) %>%
     pivot_longer(-date) %>%
+    filter(name == "confirmed") %>%
     ggplot(aes(x=date,y=value,fill=name)) +
     geom_area(position = position_stack(reverse = TRUE),
               stat="identity") +
@@ -176,26 +211,13 @@ master_graph <-function(start_date,end_date){
                 legend.position = "none")+
     ylab("")+
     xlab("")+
-    labs(title = "Current Hospitalizatons")+
+    labs(title = "Daily Hospitalizatons")+
     xlim(start_date,end_date)
   
-  vax_graph <- vaccine_state %>%
-    filter( date >= start_date,
-            date <= end_date
-    ) %>%
-    pivot_longer(-date) %>%
-    mutate(name = factor(name, 
-                         levels = c(
-                           "one_dose",
-                           "fully_vax",
-                           "boosted",
-                           "bv_boosted")
-    )
-    ) %>%
-    ggplot(aes(x=date,y=value,fill=name)) +
+  vax_dose_graph <- vaccine_doses %>%
+    ggplot(aes(x=date,y=total_doses)) +
     geom_area(position = position_stack(reverse = TRUE),
-              stat="identity") +
-    scale_fill_manual(values = c("lightblue","blue","darkblue","purple"))+
+              stat="identity", fill = "lightgreen") +
     theme_minimal()+
     theme(
       axis.line.y  = element_blank(),
@@ -209,7 +231,27 @@ master_graph <-function(start_date,end_date){
     )+
     ylab("")+
     xlab("")+
-    labs(title = "Total Vaccinations")+
+    labs(title = "Cumulative Vaccine Doses")+
+    xlim(start_date,end_date)
+  
+  vax_fully_graph <- vaccine_fully %>%
+    ggplot(aes(x=date,y=pct_vaccinated)) +
+    geom_area(position = position_stack(reverse = TRUE),
+              stat="identity", fill = "darkgreen") +
+    theme_minimal()+
+    theme(
+      axis.line.y  = element_blank(),
+      axis.ticks.y = element_blank(),
+      axis.text.y  = element_blank(),
+      axis.title.y = element_blank(),
+      axis.text.x = element_blank(),
+      
+      legend.position = "none"
+      
+    )+
+    ylab("")+
+    xlab("")+
+    labs(title = "Percent Fully Vaccinated")+
     xlim(start_date,end_date)
   
   variant_graph <- prevalent_variant %>%
@@ -294,10 +336,11 @@ master_graph <-function(start_date,end_date){
   ggpubr::ggarrange(
     timeline_graph,
     hosp_graph,
-    vax_graph,
+    vax_dose_graph,
+    vax_fully_graph,
     variant_graph,
-    nrow =4,
-    heights = c(5,2,2,1)
+    nrow =5,
+    heights = c(5,2,2,2,1)
   )
   
   
