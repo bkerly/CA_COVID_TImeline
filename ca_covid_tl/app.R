@@ -21,7 +21,7 @@ COVID_Timeline <- readxl::read_xlsx("COVID Timeline.xlsx") %>%
 
 variant_data <- read_csv("prevalent variant.csv")
 
-c = metric_data %>% 
+county_list <- metric_data %>% 
   select(county) %>%
   filter(county != "All California") %>%
   unique() %>%
@@ -68,10 +68,11 @@ metric_graph <- function(county_choice = "All California",
 #              county_choice = "Yolo")
 
 timeline_graph <- function(start_date = ymd("2020-3-1"),
-                           end_date = ymd("2022-3-1")
+                           end_date = ymd("2022-3-1"),
+                           input_data = COVID_Timeline
 ) {
   
-  COVID_Timeline %>%
+  input_data %>%
     filter( date >= start_date,
             date <= end_date
     ) %>%
@@ -85,7 +86,7 @@ timeline_graph <- function(start_date = ymd("2020-3-1"),
     geom_hline(yintercept = 1)+
     #theme_void() +
     geom_point(
-      color = "red",
+      aes(color = type),
       size = 3
     ) +
     ggrepel::  geom_text_repel(
@@ -171,14 +172,16 @@ merged_graph <- function(
       "Total Hospitalizations",
       "Vaccine Doses"
     ),
-    county = "Yolo"
+    county = "Yolo",
+    timeline_input = COVID_Timeline
 )
 {
   
   graphs = list(
     timeline_graph(
       start_date = start_date,
-      end_date = end_date
+      end_date = end_date,
+      input_data = timeline_input
     ),
     variant_graph(start_date = start_date,
                   end_date = end_date)
@@ -266,6 +269,8 @@ ui <- fluidPage(
         value = c(ymd("2020-3-1"),ymd("2022-3-1"))
       ), #/ sliderInput
       
+      uiOutput("eventTypes"), #/ checkboxGroupInput Graphs
+      
       checkboxGroupInput(
         "metrics", label = "Select Metric Graphs to Display",
         choices = c(
@@ -283,15 +288,37 @@ ui <- fluidPage(
       sliderInput(inputId = "height", label = "Height", min = 500, max = 2000, value = 1000),
       sliderInput(inputId = "width", label = "Width", min = 500, max = 2000, value = 1250),
       
-      downloadButton('downloadData', 'Download Data'),
+      downloadButton('downloadData', 'Download Timeline Data'),
       downloadButton('downloadPlot', 'Download Plot'
-      ) #/ Download Buttons
+      ), #/ Download Buttons
       
+      tags$hr(), # horizontal line
+      
+      fileInput("custom_timeline", "Upload a Custom Timeline File",
+                multiple = TRUE,
+                accept = c("text/csv",
+                           "text/comma-separated-values,text/plain",
+                           ".csv")), #/ fileinput
+      
+      p("Note: Only CSV files accepted. Be sure to preserve column names and formats from the Timeline Data file.")
       
     ), #/ sidebar panel
     
     mainPanel(
-      plotOutput("timeline", height="800px")
+      tabsetPanel(type = "tabs",
+                  tabPanel("Timeline", plotOutput("timeline", height="800px")),
+                  tabPanel("Notes", 
+                           h1("California COVID-19 Timeline"),
+                           p("This is an interactive timeline of events related to the COVID-19 pandemic in California, along with data covering key metrics related to the course of the pandemic. The events are gathered from various news sources and internal CDPH resources, with citations available after downloading the data. "),
+                           p("This timeline is designed as an interactive tool. The menu items on the right allow you to adjust disease and vaccination metrics for specific counties, choose which metrics to show or hide, along with facilitating some control of what events are visible on the timeline."),
+                           p("All graphs automatically adjust to the range selected in the date slider. You can see more granular event details by choosing a shorter time span. Events are ranked in rough order of importance."),
+                           p("You can also create your own events timeline by downloading, modifying, and uploading new data into the timeline file. Data must be uploaded as a csv with the same formatting as the downloadable file. You can save your edited file for later use, although if you leave and restart the applicaton your data will not be saved."),
+                           p("You can alter the size of the diagram for export for use in slide presentations. You can save the timeline either by right clicking direclty on the application or by clicking the save button."),
+                           em("Any questions or errors should be sent to brian.erly@cdph.ca.gov")
+                           
+                           )
+      ) #/ tabset panel
+      
     ) #/ main panel
   )
   
@@ -305,7 +332,45 @@ ui <- fluidPage(
 server <- function(input, output, session) {
   
   
+  #Update with Custom Data
+  TimelineUpdator <- function(){
+    if(isTruthy(input$custom_timeline$datapath)) {
+      COVID_Timeline <- read_csv(file= input$custom_timeline$datapath) %>% 
+        mutate(date = mdy(date))
+    } else {
+      COVID_Timeline <- COVID_Timeline
+    }
+  }
   
+  output$eventTypes = renderUI({
+    checkboxGroupInput(
+    "events", label = "Select Event Types to Display",
+    choices = c(
+      TimelineUpdator() %>%  select(type) %>% unique() %>% unlist() %>% as.character()
+    ),
+    selected = c(
+      TimelineUpdator() %>%  select(type) %>% unique() %>% unlist() %>% as.character()
+    )
+  )
+  })
+  
+# 
+#   # Check for custom data
+#   COVID_Timeline1 <- reactive({
+#     
+#     #COVID_Timeline
+#     
+#     print(input$custom_timeline$datapath)
+#     
+#     req(input$custom_timeline)
+#     
+#     read_csv(file= input$custom_timeline$datapath) %>% 
+#       mutate(date = mdy(date))
+#     
+#       })
+#   
+
+
   # Make the plot
   
   make_plot <- function(){
@@ -314,7 +379,10 @@ server <- function(input, output, session) {
                  metric_graphs = 
                    input$metrics
                  ,
-                 input$county)
+                 input$county,
+                 timeline_input = TimelineUpdator() %>%
+                   filter(type %in% input$events)
+    )
   }
   
   # Draw the plot
@@ -360,3 +428,4 @@ server <- function(input, output, session) {
 }
 
 shinyApp(ui = ui, server = server)
+
