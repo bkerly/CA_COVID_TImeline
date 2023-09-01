@@ -5,9 +5,10 @@ account: brianerlycdphe
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 9171027
-bundleId: 7263708
+bundleId: 7575638
 url: https://brianerly.shinyapps.io/ca_covid_tl/
-when: 1685039424.81746
-lastSyncTime: 1685039424.81747
+when: 1692213043.50392
+lastSyncTime: 1692213043.50393
 asMultiple: FALSE
 asStatic: FALSE
+ignoredFiles: Metric Data_old.csv
