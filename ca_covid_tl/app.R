@@ -10,16 +10,21 @@
 library(shiny)
 library(tidyverse)
 library(lubridate)
+# Look how few packages I loaded! It's because I am an efficient and parsimonious coder.
 
 
 # Load Data --------------------------------------------------------
 
 metric_data <- read_csv("Metric Data.csv")
+# This loads the day-by-day COVID metrics created by data_merger.R
 
 COVID_Timeline <- readxl::read_xlsx("COVID Timeline.xlsx") %>%
+  # This loads the written timeline data, which is hand coded in an .xlsx format.
   mutate(date = as.Date(date))
+  # Makes sure the dates are read as dates! Also and by the way, excel is really bad at formatting dates consistently, so if you don't find an event you expect it's probably excel's fault
 
 variant_data <- read_csv("prevalent variant.csv")
+# This loads data about when different variants were most prevalent. 
 
 county_list <- metric_data %>%
   select(county) %>%
@@ -29,22 +34,24 @@ county_list <- metric_data %>%
   unlist() %>%
   append("All California", 0) %>%
   unname()
+# This (probably inefficient) bit just creates a list of all the counties in California, formatted as per the "metric data" list.
 
 
 # Create Graph Themes ------------------------------------------------------
 
-metric_graph <- function(county_choice = "All California",
-                         line_color = "blue",
-                         column_name = "total_hosp",
-                         graph_title = "Daily Hospitalizations",
-                         start_date = ymd("2020-3-1"),
-                         end_date = ymd("2022-3-1")) {
+# This function generates grapphs for any of the metrics in the "LOAD DATA" step
+metric_graph <- function(county_choice = "All California", # Which county
+                         line_color = "blue", # What color line on the graph
+                         column_name = "total_hosp", # Which column of Metric Data do you want to pull data from
+                         graph_title = "Daily Hospitalizations", # What do you want the graph title to be
+                         start_date = ymd("2020-3-1"), # What are the start and end dates of the graph?
+                         end_date = ymd("2022-3-1")) { 
   metric_data %>%
     filter(county == county_choice) %>%
     filter(date >= start_date,
-           date <= end_date) %>%
-    ggplot(aes(x = date, y = .[[column_name]])) +
-    geom_area(stat = "identity", fill = line_color) +
+           date <= end_date) %>% # Up to here just filteres the data to show only what you want
+    ggplot(aes(x = date, y = .[[column_name]])) + 
+    geom_area(stat = "identity", fill = line_color) + # Draws the basic graph
     theme_minimal() +
     theme(
       axis.line.y  = element_blank(),
@@ -57,7 +64,8 @@ metric_graph <- function(county_choice = "All California",
     ylab("") +
     xlab("") +
     labs(title = graph_title) +
-    xlim(start_date, end_date)
+    xlim(start_date, end_date) # Everything down to here is just to make it pretty
+  
   
 }
 
