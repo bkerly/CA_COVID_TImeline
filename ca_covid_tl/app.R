@@ -461,7 +461,8 @@ ui <- fluidPage(sidebarLayout(
       } else {
         COVID_Timeline <- COVID_Timeline
       }
-    }
+    } # If someone has uploaded custom timeline data this will switch over to using that. 
+    #/ TimelineUpdator
     
     output$eventTypes = renderUI({
       checkboxGroupInput(
@@ -473,7 +474,7 @@ ui <- fluidPage(sidebarLayout(
         selected = c(
           TimelineUpdator() %>%  select(type) %>% unique() %>% unlist() %>% as.character()
         )
-      )
+      )# This changes the event types options displayed based on what's available in the timeline (either the default or custom one)
     })
     
 
@@ -490,7 +491,7 @@ ui <- fluidPage(sidebarLayout(
         input$county,
         timeline_input = TimelineUpdator() %>%
           filter(type %in% input$events)
-      )
+      ) # OK, I know it was a lot of functions before the UI setting, but look how little this function is!
     }
     
     # Draw the plot
@@ -500,9 +501,9 @@ ui <- fluidPage(sidebarLayout(
         input$width,
       height = function()
         input$height,
-      res = 96,
+      res = 96, # I tried making this variable but it didn't work.
       make_plot()
-    )
+    ) # And this just draws the plot at the size you said.
     
     # Download Plot
     
@@ -518,7 +519,7 @@ ui <- fluidPage(sidebarLayout(
         
         dev.off()
         
-      }
+      } # Lets you download the plot. Actually redraws it, weirdly enough.
     )
     
     # Downloading Data
@@ -530,12 +531,12 @@ ui <- fluidPage(sidebarLayout(
       content = function(file) {
         write.csv(data, file)
       }
-    )
+    ) # This lets folks download the data for the timeline, which might be useful if they want to check the sourcing or make their own timeline
     
     
     
     
-  }
+  } #/ server
   
-  shinyApp(ui = ui, server = server)
+  shinyApp(ui = ui, server = server) # Run it!
   
