@@ -37,7 +37,7 @@ county_list <- metric_data %>%
 # This (probably inefficient) bit just creates a list of all the counties in California, formatted as per the "metric data" list.
 
 
-# Create Graph Themes ------------------------------------------------------
+# Create Graph Template Functions  ------------------------------------------------------
 
 # This function generates grapphs for any of the metrics in the "LOAD DATA" step
 metric_graph <- function(county_choice = "All California", # Which county
@@ -64,30 +64,32 @@ metric_graph <- function(county_choice = "All California", # Which county
     ylab("") +
     xlab("") +
     labs(title = graph_title) +
-    xlim(start_date, end_date) # Everything down to here is just to make it pretty
+    xlim(start_date, end_date) # Everything down to here is just to make it pretty and consistent.
   
   
 }
 
+# Here's a test graph to try out! Uncomment to run
 # metric_graph(column_name = "total_doses",
 #              line_color = "green",
 #              graph_title = "total doses",
 #              county_choice = "Yolo")
 
-timeline_graph <- function(start_date = ymd("2020-3-1"),
+# Since the timeline graph is formatted differently, it uses a different function
+timeline_graph <- function(start_date = ymd("2020-3-1"), # Just picks the start and end dates as above.
                            end_date = ymd("2022-3-1"),
-                           input_data = COVID_Timeline) {
+                           input_data = COVID_Timeline # You specify the input here so if you want you can filter it later.
+                           ) {
   input_data %>%
     filter(date >= start_date,
-           date <= end_date) %>%
-    slice_max(importance, n = 15) %>%
+           date <= end_date) %>% # Filter for the dates you want
+    slice_max(importance, n = 15) %>% # Only shows the top 15 events for a given time span so it's not too crowded. Includes ties, though, so it could be more than 15 things.
     ggplot(aes(x = date,
                y = 1,
-               label = event)) +
-    geom_hline(yintercept = 1) +
-    #theme_void() +
+               label = event)) + 
+    geom_hline(yintercept = 1) + # Draws a nice line for all the points to go on
     geom_point(aes(color = type),
-               size = 3) +
+               size = 3)  + # Adds a point on the line for each event
     ggrepel::geom_text_repel(
       force_pull   = 0,
       # do not pull toward data points
@@ -98,7 +100,7 @@ timeline_graph <- function(start_date = ymd("2020-3-1"),
       segment.size = 0.2,
       max.iter = 1e4,
       max.time = 1
-    ) +
+    ) + # Creates text for each event and draws a line to the point. See the help for "geom_text_repel" to figure out what those options are.
     theme_minimal() +
     
     theme(
@@ -111,24 +113,34 @@ timeline_graph <- function(start_date = ymd("2020-3-1"),
       
     ) +
     xlab("") +
-    xlim(start_date, end_date)
+    xlim(start_date, end_date) # The rest just makes it pretty
   
 }
 
+# This is a trial graph you can uncomment to try. 
 # timeline_graph(start_date = ymd("2020-3-15"),
 #                end_date = ymd("2020-4-1"))
 
+
+# Finally, the variant graphs also have their own formatting
 variant_graph <- function(start_date = ymd("2020-3-1"),
-                          end_date = ymd("2022-3-1")) {
+                          end_date = ymd("2022-3-1") # Adds in start and stop dates
+                          ) {
   variant_data %>%
     filter(Start <= end_date,
-           End >= start_date) %>%
+           End >= start_date) %>% 
     mutate(Start = case_when(Start > start_date ~ Start,
                              TRUE ~ start_date)) %>%
     mutate(End = case_when(End < end_date ~ End,
-                           TRUE ~ end_date)) %>%
+                           TRUE ~ end_date)) %>% 
+    # OK, so this is wonky and took me a while to work out, so I'll try to explain it here.
+    # Basically, every variant has a start and an end point.
+    # And if those are all within the bounds of the graph, great! That's easy.
+    # But if they're NOT, then you need to truncate the start and end point to match the start and end date from the graph.
+    # That's what that logic does in the above two "mutates"
     mutate(midpoint = as.Date((as.numeric(End) +
                                  as.numeric(Start)) / 2, origin = '1970-01-01')) %>%
+    # Oh, and this finds the middle of each variant time span for labeling purposes. Why didn't I use lubridate for this? I don't know. 
     ggplot() +
     geom_rect(aes(
       xmin = Start,
@@ -136,10 +148,11 @@ variant_graph <- function(start_date = ymd("2020-3-1"),
       ymin = 1,
       ymax = 0,
       fill = variant_name
-    )) +
+    )) + # This draws a rectangle for each variant.
     geom_label(aes(x = midpoint,
                    y = 0.5,
                    label = variant_name)) +
+    # This labels each variant rectangle
     ylab("") +
     xlab("") +
     labs(title = "Dominant Variant") +
@@ -153,10 +166,11 @@ variant_graph <- function(start_date = ymd("2020-3-1"),
       legend.position = "none"
       
     ) +
-    xlim(start_date, end_date)
+    xlim(start_date, end_date) # Everything down to here is just formatting, again. Why isn't this repetitive formatting a single function? Again, I don't know.
   
 }
 
+# Here's a test
 # variant_graph(start_date = ymd("2021-1-1"),
 #               end_date = ymd("2023-1-1")
 # )
@@ -165,35 +179,37 @@ variant_graph <- function(start_date = ymd("2020-3-1"),
 
 blueprint_graph <- function(county_choice = "All California",
                             start_date = ymd("2020-3-1"),
-                            end_date = ymd("2022-3-1")) {
+                            end_date = ymd("2022-3-1") # Sets your county filters and date filters, as above.
+                            ) { 
   
   
     metric_data %>%
     filter(case_when(
       county_choice == 'All California' ~ TRUE,
       TRUE ~ county %in% county_choice
-    )) %>%
+    )) %>% 
     filter(date >= start_date,
-           date <= end_date) %>%
+           date <= end_date) %>% # Filters based on your county and dates of interest. Could probably be one "filter" with commas, but here we are.
     group_by(date, blueprint_level) %>%
     summarize(count = n()) %>%
-    ungroup()  %>%
+    ungroup()  %>% # This collapses the county- and date-wise listing of blueprint levels into just date-wise listings.
     complete(date, blueprint_level, fill = list(count = 0)) %>%
+    # This makes sure that missing values (if no county is in that blueprint level) are 0 or else the graph would try to interpolate! And that's not good.
     ggplot(aes(
       x = date,
       y = count,
       color = blueprint_level,
       fill = blueprint_level
     )) +
-    geom_area(na.rm = TRUE, position = position_fill(reverse = TRUE),linewidth=0) +
+    geom_area(na.rm = TRUE, position = position_fill(reverse = TRUE),linewidth=0) + # Makes a basic area graph
     scale_fill_manual(
       values = c("purple", "red", "orange", "yellow"),
       na.value = rgb(0, 0, 255, max = 255, alpha = 0, names = "transparent")
-    ) +
+    ) + # Makes the colors match the blueprint colors, and makes missing values transparent. 
     scale_color_manual(
       values = rgb(0, 0, 255, max = 255, alpha = 0, names = "transparent"),
       na.value = rgb(0, 0, 255, max = 255, alpha = 0, names = "transparent")
-    ) +
+    ) + # Also makes misisng values transparent. Are both necessary? I haven't tried without it.
     ylab("") +
     xlab("") +
     labs(title = "Blueprint Levels by County") +
@@ -206,17 +222,19 @@ blueprint_graph <- function(county_choice = "All California",
       axis.title.y = element_blank(),
       legend.position = "none"
       
-    )
+    ) # Repetative formatting? Nice.
 }
 
 
 # Create a Single Merged Graph --------------------------------------------
+# Once you have all the individual graphs written as functions up above, you need to make them into one super-image with consistent dates, county filters, etc. That makes it convenient to code within shiny and export etc.  
+
 merged_graph <- function(start_date = ymd("2020-3-1"),
-                         end_date = ymd("2022-3-1"),
+                         end_date = ymd("2022-3-1"), # Start and end dates for ALL graphs
                          metric_graphs = list("Blueprint Levels",
                                               "Total Hospitalizations",
-                                              "Vaccine Doses"),
-                         county = "Yolo",
+                                              "Vaccine Doses"), # Chooses which of the metric graphs you want to show. 
+                         county = "Yolo", #County you want to graph, `All California` is statewide data.
                          timeline_input = COVID_Timeline)
 {
   graphs = list(
@@ -228,6 +246,8 @@ merged_graph <- function(start_date = ymd("2020-3-1"),
     variant_graph(start_date = start_date,
                   end_date = end_date)
   ) #/ list
+  
+
   
   if ("Percent Fully Vaccinated" %in% metric_graphs) {
     graphs <- append(graphs,
