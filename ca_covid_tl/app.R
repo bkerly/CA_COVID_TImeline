@@ -228,6 +228,7 @@ blueprint_graph <- function(county_choice = "All California",
 
 # Create a Single Merged Graph --------------------------------------------
 # Once you have all the individual graphs written as functions up above, you need to make them into one super-image with consistent dates, county filters, etc. That makes it convenient to code within shiny and export etc.  
+# The way it works is you make a list of the graphs you want and then use "ggpubr::ggarrange" to make them into one big graph image!
 
 merged_graph <- function(start_date = ymd("2020-3-1"),
                          end_date = ymd("2022-3-1"), # Start and end dates for ALL graphs
@@ -246,23 +247,27 @@ merged_graph <- function(start_date = ymd("2020-3-1"),
     variant_graph(start_date = start_date,
                   end_date = end_date)
   ) #/ list
+# This initializes the list of graphs you'll show. It makes sure you show at least the timeine and the variant graphs. 
   
-
+  # And then, graph by graph, you add each additional graph you want to add. It builds from second to last up to second to first, if that makes sense. 
   
   if ("Percent Fully Vaccinated" %in% metric_graphs) {
-    graphs <- append(graphs,
+    graphs <- append(graphs, # adds to the growing list of graphs
                      list(
                        metric_graph(
                          column_name = "pct_fully_vaccinated",
                          line_color = "darkgreen",
                          graph_title = "Percent Population Fully Vaccinated",
                          county_choice = county
-                       )
-                     ), 1)
+                       ) 
+                     )# Graph function arguments are given as a list.
+                     , 1 # Adds after position 1 (which is the second position)
+                     )
   }
   
+  # This repeats what was above! Could it be a function to avoid rewriting, especially since they're all metric graphs? Yeah...
   if ("Vaccine Doses" %in% metric_graphs) {
-    graphs <- append(graphs,
+    graphs <- append(graphs, 
                      list(
                        metric_graph(
                          column_name = "total_doses",
@@ -300,6 +305,7 @@ merged_graph <- function(start_date = ymd("2020-3-1"),
                      ), 1)
   }
   
+  # Oh, but see! This one is a little different, it's the blueprint graph! Couldn't make this a function!
   if ("Blueprint Levels" %in% metric_graphs) {
     graphs <- append(graphs,
                      list(
@@ -312,30 +318,33 @@ merged_graph <- function(start_date = ymd("2020-3-1"),
   }
   
   
+  # These next two things help to make sure the graphs are properly formatted, with the timeline real big and the variants real small and everything else in the middle. 
+  num_graphs = length(graphs) 
   
-  num_graphs = length(graphs)
+  graph_heights = c(5, # Timeline graph; big!
+                    rep.int(2, times = num_graphs - 2), # Blueprint and metric graphs; in the middle!
+                    1) # variant graph; small!
   
-  graph_heights = c(5,
-                    rep.int(2, times = num_graphs - 2),
-                    1)
-  
-  ggpubr::ggarrange(plotlist = graphs,
-                    nrow = num_graphs,
-                    heights = graph_heights)
+  ggpubr::ggarrange(plotlist = graphs, # The lsit of all the graphs
+                    nrow = num_graphs, # One per row
+                    heights = graph_heights) # with the heights you define above
 }
 
-
+# Uncomment to try it out with the default settings
 #merged_graph()
 
 
 # UI ----------------------------------------------------------------------
 
+#Nice! Now we're doing shiny apps.
 
 
 ui <- fluidPage(sidebarLayout(
+  
+  # This defines the sidebar, where all the switches and sliders and knobs and buttons are. The sidebar stays the same throughout. 
   sidebarPanel(
     selectInput("county", label = "Select County",
-                choices = c(county_list)),
+                choices = c(county_list)), # A dropdown list of all the counties
     #/ selectInput
     
     
@@ -345,10 +354,11 @@ ui <- fluidPage(sidebarLayout(
       min = ymd("2019-9-1"),
       max = ymd("2023-4-1"),
       value = c(ymd("2020-3-1"), ymd("2022-3-1"))
-    ),
+    ), # A slider of all the available dates. It defaults to a little less than the maximum width for no good reason.
     #/ sliderInput
     
     uiOutput("eventTypes"),
+    # Lets you choose the different times of events you want to show. "eventTypes" is defined in the server based on what is available in the timeline. This makes it so it's reactive if you (the person updating this) adds a new event category to the timeline, or if someone uploads a new timeline with some funky new catagory of events, like a "Diamond Princess" timeline.
     #/ checkboxGroupInput Graphs
     
     checkboxGroupInput(
@@ -365,6 +375,7 @@ ui <- fluidPage(sidebarLayout(
                    "Total Hospitalizations",
                    "Percent Fully Vaccinated")
     ),
+    # Lets you choose which metric graphs to display.
     #/ checkboxGroupInput Graphs
     
     sliderInput(
@@ -373,14 +384,14 @@ ui <- fluidPage(sidebarLayout(
       min = 500,
       max = 2000,
       value = 1000
-    ),
+    ), 
     sliderInput(
       inputId = "width",
       label = "Width",
       min = 500,
       max = 2000,
       value = 1250
-    ),
+    ), # Theese let you manually resize the graph, rather than having it scale to your screen. Could be good if you are making a powerpoint.
     
     downloadButton('downloadData', 'Download Timeline Data'),
     downloadButton('downloadPlot', 'Download Plot'),
@@ -396,7 +407,7 @@ ui <- fluidPage(sidebarLayout(
       accept = c("text/csv",
                  "text/comma-separated-values,text/plain",
                  ".csv")
-    ),
+    ), # People can upload custom timeline data! But they'll probably screw up the formatting somehow. 
     #/ fileinput
     
     p(
@@ -408,8 +419,8 @@ ui <- fluidPage(sidebarLayout(
   
   mainPanel(tabsetPanel(
     type = "tabs",
-    tabPanel("Timeline", plotOutput("timeline", height = "800px")),
-    tabPanel(
+    tabPanel("Timeline", plotOutput("timeline", height = "800px")), # So this is tab 1! That's it, just one graph (made up of many graphs)
+    tabPanel( # This is tab 2, which is a description of the timeline. This could probably use a read through and edit, but it's good filler text for now. 
       "Notes",
       h1("California COVID-19 Timeline"),
       p(
@@ -427,13 +438,13 @@ ui <- fluidPage(sidebarLayout(
       p(
         "You can alter the size of the diagram for export for use in slide presentations. You can save the timeline either by right clicking direclty on the application or by clicking the save button."
       ),
-      em("Any questions or errors should be sent to brian.erly@cdph.ca.gov")
+      em("Any questions or errors should be sent to brian.erly@cdph.ca.gov") # Gotta change this!
       
     )
   ) #/ tabset panel
   ) #/ main panel
-  )
-  )
+  ) #/ sidebar layout
+  ) #/ UI
   
   
   # Server ------------------------------------------------------------------
@@ -465,22 +476,7 @@ ui <- fluidPage(sidebarLayout(
       )
     })
     
-    #
-    #   # Check for custom data
-    #   COVID_Timeline1 <- reactive({
-    #
-    #     #COVID_Timeline
-    #
-    #     print(input$custom_timeline$datapath)
-    #
-    #     req(input$custom_timeline)
-    #
-    #     read_csv(file= input$custom_timeline$datapath) %>%
-    #       mutate(date = mdy(date))
-    #
-    #       })
-    #
-    
+
     
     # Make the plot
     
